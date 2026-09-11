@@ -35,3 +35,9 @@ Thumbs.db
 .coverage
 .coverage.*
 htmlcov/
+
+# Environment
+.env
+.env.local
+*.env
+!.env.example
