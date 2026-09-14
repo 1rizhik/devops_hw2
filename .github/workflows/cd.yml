@@ -24,72 +24,45 @@ jobs:
       - name: Install test dependencies
         run: pip install requests
 
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: Pull image
-        run: docker pull ${{ secrets.DOCKER_USERNAME }}/devops_hw1:latest
-
-      - name: Run container
+      - name: Create .env for docker compose
         run: |
-          docker run -d --name ml-api -p 5000:5000 \
-            ${{ secrets.DOCKER_USERNAME }}/devops_hw1:latest
-          sleep 5
+          cat > .env <<EOF
+          POSTGRES_USER=ml_user
+          POSTGRES_PASSWORD=ml_secret_password
+          POSTGRES_DB=ml_db
+          POSTGRES_HOST=db
+          POSTGRES_PORT=5432
+          EOF
+
+      - name: Start full stack with docker compose
+        run: |
+          docker compose up -d --build
+          echo "Waiting for API to be ready..."
+          for i in $(seq 1 30); do
+            if curl -s -f http://localhost:5000/health > /dev/null 2>&1; then
+              echo "API is up after ${i}s"
+              break
+            fi
+            echo "Attempt ${i}/30 - not ready yet"
+            sleep 1
+          done
+
+      - name: Verify API is responding
+        run: curl -f http://localhost:5000/health
 
       - name: Run functional tests from scenario.json
+        run: python scripts/run_scenario.py
+
+      - name: Verify predictions in database
         run: |
-          python - <<'PY'
-          import json
-          import sys
-          import requests
-
-          with open('config/scenario.json') as f:
-              scenario = json.load(f)
-
-          base_url = 'http://localhost:5000'
-          failed = 0
-
-          for tc in scenario['test_cases']:
-              url = base_url + tc['endpoint']
-              method = tc['method']
-              payload = tc.get('payload')
-
-              if method == 'GET':
-                  r = requests.get(url)
-              else:
-                  r = requests.post(url, json=payload)
-
-              print(f"[{tc['name']}] status={r.status_code}")
-              if r.status_code != tc['expected_status']:
-                  print(f"  FAIL: expected {tc['expected_status']}, got {r.status_code}")
-                  failed += 1
-                  continue
-
-              if 'expected_body_contains' in tc:
-                  body = r.json()
-                  for k, v in tc['expected_body_contains'].items():
-                      if body.get(k) != v:
-                          print(f"  FAIL: {k} != {v}")
-                          failed += 1
-
-              if 'expected_prediction' in tc:
-                  pred = r.json().get('prediction', [None])[0]
-                  if pred != tc['expected_prediction']:
-                      print(f"  FAIL: prediction {pred} != {tc['expected_prediction']}")
-                      failed += 1
-
-          if failed:
-              sys.exit(1)
-          print("All functional tests passed")
-          PY
+          docker compose exec -T db psql -U ml_user -d ml_db -c "SELECT * FROM predictions;"
 
       - name: Container logs
         if: always()
-        run: docker logs ml-api
+        run: |
+          docker compose logs ml-api
+          docker compose logs db
 
-      - name: Stop container
+      - name: Stop stack
         if: always()
-        run: docker stop ml-api || true
+        run: docker compose down -v

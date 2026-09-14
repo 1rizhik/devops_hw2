@@ -10,6 +10,28 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ml_user
+          POSTGRES_PASSWORD: ml_secret_password
+          POSTGRES_DB: ml_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ml_user
+      POSTGRES_PASSWORD: ml_secret_password
+      POSTGRES_DB: ml_db
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -23,6 +45,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+
+      - name: Initialize database schema
+        run: |
+          PGPASSWORD=ml_secret_password psql -h localhost -U ml_user -d ml_db -f db/init.sql
 
       - name: Run tests
         run: python -m pytest tests/ -v --cov=src --cov-report=term-missing
@@ -48,5 +74,5 @@ jobs:
           context: .
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/devops_hw1:latest
-            ${{ secrets.DOCKER_USERNAME }}/devops_hw1:${{ github.sha }}
+            ${{ secrets.DOCKER_USERNAME }}/devops_hw2:latest
+            ${{ secrets.DOCKER_USERNAME }}/devops_hw2:${{ github.sha }}

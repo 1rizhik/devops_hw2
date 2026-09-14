@@ -16,3 +16,6 @@ notebooks
 .dvc/tmp
 tests
 pytest.ini
+.env
+.env.*
+!.env.example

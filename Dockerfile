@@ -4,7 +4,8 @@ WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONPATH=/app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
@@ -19,4 +20,4 @@ COPY config/ ./config/
 
 EXPOSE 5000
 
-CMD ["python", "src/app.py"]
+CMD ["python", "-m", "src.app"]
