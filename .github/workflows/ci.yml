@@ -73,5 +73,4 @@ jobs:
         with:
           context: .
           push: true
-          tags: |
-            tags: ${{ secrets.DOCKER_USERNAME }}/devops_hw2:latest
+          tags: ${{ secrets.DOCKER_USERNAME }}/devops_hw2:latest
