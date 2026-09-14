@@ -10,34 +10,45 @@
             }
         },
         {
-            "name": "Predict setosa",
+            "name": "Predict authentic banknote (request_id=1)",
             "endpoint": "/predict",
             "method": "POST",
             "payload": {
-                "features": [
-                    5.1,
-                    3.5,
-                    1.4,
-                    0.2
-                ]
+                "request_id": 1
             },
             "expected_status": 200,
-            "expected_prediction": 0
+            "expected_body_contains": {
+                "request_id": 1,
+                "prediction": 0
+            }
         },
         {
-            "name": "Predict virginica",
+            "name": "Predict fake banknote (request_id=2)",
             "endpoint": "/predict",
             "method": "POST",
             "payload": {
-                "features": [
-                    6.3,
-                    3.3,
-                    6.0,
-                    2.5
-                ]
+                "request_id": 2
             },
             "expected_status": 200,
-            "expected_prediction": 2
+            "expected_body_contains": {
+                "request_id": 2,
+                "prediction": 1
+            }
+        },
+        {
+            "name": "Predict not found",
+            "endpoint": "/predict",
+            "method": "POST",
+            "payload": {
+                "request_id": 99999
+            },
+            "expected_status": 404
+        },
+        {
+            "name": "Predictions history",
+            "endpoint": "/predictions/1",
+            "method": "GET",
+            "expected_status": 200
         }
     ]
 }

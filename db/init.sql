@@ -15,8 +15,8 @@ CREATE TABLE IF NOT EXISTS predictions (
 
 CREATE INDEX IF NOT EXISTS idx_predictions_request_id ON predictions(request_id);
 
--- Тестовые данные (совпадают с scenario.json)
+-- Тестовые данные BankNote Authentication
 INSERT INTO requests (features) VALUES
-    ('[5.1, 3.5, 1.4, 0.2]'),
-    ('[6.3, 3.3, 6.0, 2.5]'),
-    ('[6.4, 3.2, 4.5, 1.5]');
+    ('[2.3718, 7.4908, 0.015989, -1.7414]'),
+    ('[-1.4446, 2.1438, -0.47241, -1.6677]'),
+    ('[3.6216, 8.6661, -2.8073, -0.44699]');
