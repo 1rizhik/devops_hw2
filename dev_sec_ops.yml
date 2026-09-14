@@ -1,15 +1,31 @@
-image: 1rizhik/devops_hw1:latest
-image_signature: "sha256:6c1985d12c9635ae89986b129fff9a3ce760b41b7ed35d2d159d83b38f5de174"
+image: 1rizhik/devops_hw2:latest
+image_signature: "TBD-after-push"
+
 test_coverage: "95%"
 
+dataset: "BankNote Authentication (UCI, 1372 rows, 4 features, binary classification)"
+task: "Binary classification with PostgreSQL integration (variant C: read + write)"
+
+architecture:
+  - db: "PostgreSQL 16 (container)"
+  - ml-api: "Flask API (container)"
+  - interaction: "API reads features from requests table, saves predictions to predictions table"
+  - secrets: "DB credentials via environment variables (.env / docker compose), no hardcoded values"
+
+metrics:
+  accuracy: 0.9964
+  f1: 0.9959
+  precision: 0.9919
+  recall: 1.0
+
 recent_commits:
-  - hash: "f6a98fd"
-    message: "Initialize DVC, track data and model"
-  - hash: "9ed241b"
-    message: "Add Flask API and tests"
-  - hash: "edb71e8"
-    message: "Add training script with RandomForest classifier"
-  - hash: "1e19842"
-    message: "Add data preparation script, config, gitattributes"
-  - hash: "cadba8c"
-    message: "Initial project structure"
+  - hash: "ba9a6e0"
+    message: "Update CI/CD for PostgreSQL: add service container and full stack"
+  - hash: "f79a066"
+    message: "Fix Dockerfile for src package, add psycopg3"
+  - hash: "77b8dbc"
+    message: "Switch to BankNote dataset, add PostgreSQL integration (variant C)"
+  - hash: "bdbaa2c"
+    message: "Add env config and PostgreSQL service in docker-compose"
+  - hash: "0bb9c12"
+    message: "Initial commit: forked from devops_hw1"
