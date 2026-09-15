@@ -1,237 +1,72 @@
 # Отчёт по домашней работе №2
 ## Взаимодействие с источниками данных (ML + PostgreSQL)
 
-## 1. Ссылки на артефакты
+## 1. Артефакты
 
-- **GitHub репозиторий:** https://github.com/1rizhik/devops_hw2
+- **GitHub:** https://github.com/1rizhik/devops_hw2
 - **Docker Hub:** https://hub.docker.com/r/1rizhik/devops_hw2
-- **Ветки:** `main` (release), `develop` (разработка)
 - **Образ:** `1rizhik/devops_hw2:latest`
-- **Базовый репозиторий:** форк `devops_hw1` (BankNote Authentication)
+- **База:** форк `devops_hw1` (BankNote Authentication)
 
-## 2. Вариант задания
+## 2. Вариант задания — C
 
-**Вариант C:** модель **читает** входные данные из БД и **записывает** результат обратной связи.
+Модель **читает** признаки из БД и **пишет** результат обратно:
 
-Архитектура:
-Client → POST /predict {request_id} → Flask API
+Client → POST /predict {request_id} → API
 ↓
-
 SELECT features FROM requests WHERE id = request_id
 ↓
-
 model.predict(features)
 ↓
+INSERT INTO predictions
 
-INSERT INTO predictions (request_id, prediction)
-↓
-← JSON {request_id, prediction, prediction_id}
 
+## 3. База данных
 
-## 3. Набор данных
+PostgreSQL 16 в Docker. Две таблицы:
+- **`requests`** — `id`, `features` (JSONB), `created_at`
+- **`predictions`** — `id`, `request_id` (FK), `prediction`, `created_at`
 
-**BankNote Authentication** (UCI ML Repository, dataset 267):
-- 1372 образца, 4 признака (variance, skewness, curtosis, entropy)
-- Целевая переменная: `class` (0 — подлинная, 1 — поддельная)
-- Разделение: 80% train (1097), 20% test (275)
+Тестовые данные (3 записи BankNote) загружаются из `db/init.sql` при первом старте.
 
-## 4. Модель
+## 4. API-сервис
 
-- **RandomForestClassifier** (n_estimators=100, random_state=42)
-- Метрики на тесте:
-  - **Accuracy: 0.9964**
-  - **F1: 0.9959**
-  - **Precision: 0.9919**
-  - **Recall: 1.0000**
+Flask (`src/app.py`):
 
-## 5. API-сервис
+- `GET /health` — `{"status": "ok"}`
+- `POST /predict` — `{"request_id": N}` → читает из БД, предсказывает, пишет в БД
+- `GET /predictions/<id>` — история предсказаний
 
-Flask-приложение (`src/app.py`):
+## 5. Безопасность
 
-| Эндпоинт | Метод | Описание |
-|---|---|---|
-| `/health` | GET | `{"status": "ok"}` |
-| `/predict` | POST | `{"request_id": 1}` → читает из БД, предсказывает, записывает |
-| `/predictions/<id>` | GET | История предсказаний по request_id |
+Пароли БД не хардкодятся — через `.env` (не в Git). В `docker-compose.yml` — переменные `${POSTGRES_USER}` и т.д.
 
-**Пример ответа `/predict`:**
-```json
-{
-  "request_id": 1,
-  "prediction": 0,
-  "prediction_id": 1
-}
+## 6. Docker Compose
 
-6. База данных
-PostgreSQL 16-alpine (в Docker-контейнере).
+- `db` — PostgreSQL, порт 5432, healthcheck, `db/init.sql`
+- `ml-api` — Flask API, порт 5000, `depends_on: db`
 
-Схема (db/init.sql):
+## 7. Тесты
 
-requests — входные признаки
+`tests/test_api.py` — 6 тестов с реальной БД: health, predict (0 и 1), 400, 404, история.
 
-id SERIAL PRIMARY KEY
+## 8. CI Pipeline
 
-features JSONB NOT NULL
+`.github/workflows/ci.yml`:
+- Job `test` — сервис-контейнер PostgreSQL 16, `pytest`
+- Job `build-and-push` (push в main) — сборка и push образа
 
-created_at TIMESTAMP
+## 9. CD Pipeline
 
-predictions — результаты предсказаний
+`.github/workflows/cd.yml` — после успешного CI:
+- `docker compose up -d --build` — полный стек
+- `run_scenario.py` — 5 сценариев
+- Проверка `SELECT * FROM predictions`
 
-id SERIAL PRIMARY KEY
+**Результат:** все сценарии пройдены, записи в БД присутствуют.
 
-request_id INTEGER REFERENCES requests(id)
+## 10. Выводы
 
-prediction INTEGER
-
-created_at TIMESTAMP
-
-Тестовые данные (3 записи BankNote) загружаются автоматически при первом старте контейнера.
-
-7. Аутентификация и безопасность
-Пароли БД не хардкодятся — передаются через переменные окружения
-
-.env — локально, не коммитится в Git (в .gitignore)
-
-.env.example — шаблон для документации
-
-В docker-compose.yml — ${POSTGRES_USER}, ${POSTGRES_PASSWORD} из .env
-
-В GitHub Actions CD — .env создаётся на лету из литеральных значений (без секретов)
-
-8. Docker Compose
-docker-compose.yml описывает 2 сервиса:
-
-db — PostgreSQL, порт 5432, healthcheck, volume db_data, монтирует db/init.sql
-
-ml-api — Flask API, порт 5000, depends_on: db (service_healthy), env-переменные БД
-
-Запуск:
-
-bash
-docker compose up -d --build
-
-9. Тесты
-tests/test_api.py — 6 тестов с реальной БД:
-
-test_health — health-check
-
-test_predict_authentic — request_id=1 → prediction=0
-
-test_predict_fake — request_id=2 → prediction=1
-
-test_predict_missing_request_id — 400
-
-test_predict_not_found — 404
-
-test_predictions_history — история по request_id
-
-tests/conftest.py — добавляет корень проекта в sys.path
-
-10. CI Pipeline (GitHub Actions)
-Файл: .github/workflows/ci.yml
-
-Триггеры:
-
-pull_request в main → job test
-
-push в main → jobs test + build-and-push
-
-Job test:
-
-Сервис-контейнер PostgreSQL 16 (services: postgres)
-
-Python 3.12
-
-Установка зависимостей
-
-Initialize database schema — psql -f db/init.sql
-
-pytest tests/ -v
-
-Job build-and-push (только на push в main):
-
-Логин в Docker Hub
-
-Сборка образа
-
-Push 1rizhik/devops_hw2:latest
-
-11. CD Pipeline (GitHub Actions)
-Файл: .github/workflows/cd.yml
-
-Триггеры:
-
-workflow_run после успешного CI на main
-
-workflow_dispatch (вручную)
-
-Job functional-test:
-
-Checkout
-
-Python 3.12 + requests
-
-Создание .env для docker compose
-
-docker compose up -d --build — полный стек (PostgreSQL + API)
-
-Retry-loop на /health до 30 сек
-
-python scripts/run_scenario.py — 5 сценариев
-
-docker compose exec db psql ... SELECT * FROM predictions — проверка записи в БД
-
-Логи + docker compose down -v
-
-Результаты CD Pipeline:
-
-text
-[Health check] status=200
-[Predict authentic banknote (request_id=1)] status=200
-[Predict fake banknote (request_id=2)] status=200
-[Predict not found] status=404
-[Predictions history] status=200
-
-All functional tests passed
-
-Verify predictions in database:
- id | request_id | prediction |         created_at
-----+------------+------------+----------------------------
-  1 |          1 |          0 | 2026-09-14 12:34:28.11615
-  2 |          2 |          1 | 2026-09-14 12:34:28.146222
-(2 rows)
-12. Сценарии тестирования
-Файл: config/scenario.json:
-
-Health check — GET /health → 200
-
-Predict authentic — POST /predict {request_id: 1} → prediction=0
-
-Predict fake — POST /predict {request_id: 2} → prediction=1
-
-Predict not found — POST /predict {request_id: 99999} → 404
-
-Predictions history — GET /predictions/1 → 200
-
-13. Ссылки на артефакты
-GitHub: https://github.com/1rizhik/devops_hw2
-
-Docker Hub: https://hub.docker.com/r/1rizhik/devops_hw2
-
-Zip-архив: devops_hw2_dist.zip (актуальный)
-
-14. Выводы
-Реализовано взаимодействие ML-модели с PostgreSQL по варианту C:
-
-API читает признаки из таблицы requests
-
-Делает предсказание моделью BankNote
-
-Записывает результат в таблицу predictions
-
-Обеспечена безопасность: пароли БД не в коде, только через .env и переменные окружения.
-
-CI Pipeline поднимает PostgreSQL как сервис-контейнер и прогоняет pytest.
-CD Pipeline запускает полный стек через docker compose и проводит функциональное тестирование с проверкой записей в БД.
+Реализовано взаимодействие ML-модели с PostgreSQL по варианту C. Пароли БД — только через переменные окружения. CI/CD запускают полный стек с проверкой БД.
 
 Все требования задания выполнены.
